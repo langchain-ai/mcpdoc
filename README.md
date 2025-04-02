@@ -48,8 +48,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 #### (Optional) Test the MCP server locally with your `llms.txt` file(s) of choice:
 ```bash
 uvx --from mcpdoc mcpdoc \
-    --urls LangGraph:https://langchain-ai.github.io/langgraph/llms.txt \
-    --urls LangChain:https://python.langchain.com/llms.txt \
+    --urls "LangGraph:https://langchain-ai.github.io/langgraph/llms.txt" "LangChain:https://python.langchain.com/llms.txt" \
     --transport sse \
     --port 8082 \
     --host localhost
@@ -87,9 +86,7 @@ npx @modelcontextprotocol/inspector
         "mcpdoc",
         "mcpdoc",
         "--urls",
-        "LangGraph:https://langchain-ai.github.io/langgraph/llms.txt",
-        "--urls",
-        "LangChain:https://python.langchain.com/llms.txt",
+        "LangGraph:https://langchain-ai.github.io/langgraph/llms.txt LangChain:https://python.langchain.com/llms.txt",
         "--transport",
         "stdio"
       ]
