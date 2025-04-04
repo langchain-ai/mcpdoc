@@ -1,0 +1,8 @@
+# Default configuration for mcpdoc server
+# Loaded by the Docker container's CMD instruction
+- name: LangGraph
+  llms_txt: https://langchain-ai.github.io/langgraph/llms.txt
+- name: LangChain
+  llms_txt: https://python.langchain.com/llms.txt
+- name: Pydantic
+  llms_txt: https://ai.pydantic.dev/llms.txt
