@@ -9,6 +9,7 @@ dependencies = [
     "httpx>=0.28.1",
     "markdownify>=1.1.0",
     "mcp[cli]>=1.4.1",
+    "pypdf>=5.4.0",
     "pyyaml>=6.0.1",
 ]
 
