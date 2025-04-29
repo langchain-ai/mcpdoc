@@ -7,7 +7,7 @@ import httpx
 from markdownify import markdownify
 from mcp.server.fastmcp import FastMCP
 from typing_extensions import NotRequired, TypedDict
-
+from pypdf import PdfReader
 
 class DocSource(TypedDict):
     """A source of documentation for a library or a package."""
@@ -20,6 +20,17 @@ class DocSource(TypedDict):
 
     description: NotRequired[str]
     """Description of the documentation source (optional)."""
+
+def extract_text_from_pdf(pdf_file) -> str:
+    """Extract text content from a PDF file."""
+    try:
+        reader = PdfReader(pdf_file)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
+        return text.strip()
+    except Exception as e:
+        raise ValueError(f"Failed to extract text from PDF: {str(e)}")
 
 
 def extract_domain(url: str) -> str:
@@ -213,7 +224,14 @@ def create_server(
             try:
                 response = await httpx_client.get(url, timeout=timeout)
                 response.raise_for_status()
-                return markdownify(response.text)
+                if url.endswith(".txt"):
+                    return  response.text
+                elif url.endswith(".md"):
+                    return markdownify(response.text)
+                elif url.endswith(".pdf"):
+                    return extract_text_from_pdf(io.BytesIO(response.content))
+                else:
+                    return markdownify(response.text)
             except (httpx.HTTPStatusError, httpx.RequestError) as e:
                 return f"Encountered an HTTP error: {str(e)}"
 
