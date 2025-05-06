@@ -1,0 +1,57 @@
+# Smithery configuration file: https://smithery.ai/docs/build/project-config
+
+startCommand:
+  type: stdio
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    type: object
+    required:
+      - urls
+    properties:
+      urls:
+        type: array
+        items:
+          type: string
+        description: "List of llms.txt URLs or file paths with optional names (format:
+          'url' or 'name:url')"
+      allowedDomains:
+        type: array
+        items:
+          type: string
+        description: Additional allowed domains to fetch documentation from. Use '*' to
+          allow all domains.
+      followRedirects:
+        type: boolean
+        default: false
+        description: Whether to follow HTTP redirects when fetching docs.
+      timeout:
+        type: number
+        default: 10
+        description: HTTP request timeout in seconds.
+  commandFunction:
+    # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
+    |-
+    (config) => {
+      const args = [];
+      if (config.followRedirects) args.push("--follow-redirects");
+      if (config.allowedDomains) {
+        config.allowedDomains.forEach(domain => {
+          args.push("--allowed-domains", domain);
+        });
+      }
+      if (config.timeout !== undefined) {
+        args.push("--timeout", String(config.timeout));
+      }
+      config.urls.forEach(url => {
+        args.push("--urls", url);
+      });
+      args.push("--transport", "stdio");
+      return { command: "mcpdoc", args };
+    }
+  exampleConfig:
+    urls:
+      - LangGraph:https://langchain-ai.github.io/langgraph/llms.txt
+      - LangChain:https://python.langchain.com/llms.txt
+    allowedDomains: []
+    followRedirects: false
+    timeout: 10
