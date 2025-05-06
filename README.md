@@ -1,5 +1,7 @@
 # MCP LLMS-TXT Documentation Server
 
+[![smithery badge](https://smithery.ai/badge/@langchain-ai/mcpdoc)](https://smithery.ai/server/@langchain-ai/mcpdoc)
+
 ## Overview
 
 [llms.txt](https://llmstxt.org/) is a website index for LLMs, providing background information, guidance, and links to detailed markdown files. IDEs like Cursor and Windsurf or apps like Claude Code/Desktop can use `llms.txt` to retrieve context for tasks. However, these apps use different built-in tools to read and process files like `llms.txt`. The retrieval process can be opaque, and there is not always a way to audit the tool calls or the context returned.
@@ -20,6 +22,14 @@ You can find llms.txt files for langgraph and langchain here:
 | LangChain JS     | [https://js.langchain.com/llms.txt](https://js.langchain.com/llms.txt)                                     |
 
 ## Quickstart
+
+### Installing via Smithery
+
+To install MCP LLMS-TXT Documentation Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@langchain-ai/mcpdoc):
+
+```bash
+npx -y @smithery/cli install @langchain-ai/mcpdoc --client claude
+```
 
 #### Install uv
 * Please see [official uv docs](https://docs.astral.sh/uv/getting-started/installation/#installation-methods) for other ways to install `uv`.
