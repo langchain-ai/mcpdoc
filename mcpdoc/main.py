@@ -91,6 +91,52 @@ def _normalize_path(path: str) -> str:
     )
 
 
+def _get_server_instructions(doc_sources: list[DocSource]) -> str:
+    """Generate server instructions with available documentation source names."""
+    # Extract source names from doc_sources
+    source_names = []
+    for entry in doc_sources:
+        if "name" in entry:
+            source_names.append(entry["name"])
+        elif _is_http_or_https(entry["llms_txt"]):
+            # Use domain name as fallback for HTTP sources
+            domain = extract_domain(entry["llms_txt"])
+            source_names.append(domain.rstrip("/").split("//")[-1])
+        else:
+            # Use filename as fallback for local sources
+            source_names.append(os.path.basename(entry["llms_txt"]))
+
+    instructions = [
+        "Use the list_doc_sources tool to see available documentation sources.",
+        "This tool will return a URL for each documentation source.",
+    ]
+
+    if source_names:
+        if len(source_names) == 1:
+            instructions.append(
+                f"Documentation URLs are available from this tool "
+                f"for {source_names[0]}."
+            )
+        else:
+            names_str = ", ".join(source_names[:-1]) + f", and {source_names[-1]}"
+            instructions.append(
+                f"Documentation URLs are available from this tool for {names_str}."
+            )
+
+    instructions.extend(
+        [
+            "",
+            "Once you have a source documentation URL, use the fetch_docs tool "
+            "to get the documentation contents. ",
+            "If the documentation contents contains a URL for additional documentation "
+            "that is relevant to your task, you can use the fetch_docs tool to "
+            "fetch documentation from that URL next.",
+        ]
+    )
+
+    return "\n".join(instructions)
+
+
 def create_server(
     doc_sources: list[DocSource],
     *,
@@ -117,11 +163,7 @@ def create_server(
     settings = settings or {}
     server = FastMCP(
         name="llms-txt",
-        instructions=(
-            "Use the list doc sources tool to see available documentation "
-            "sources. Once you have a source, use fetch docs to get the "
-            "documentation"
-        ),
+        instructions=_get_server_instructions(doc_sources),
         **settings,
     )
     httpx_client = httpx.AsyncClient(follow_redirects=follow_redirects, timeout=timeout)
