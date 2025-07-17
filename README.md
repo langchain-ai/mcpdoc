@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/langchain-ai-mcpdoc-badge.png)](https://mseep.ai/app/langchain-ai-mcpdoc)
+
 # MCP LLMS-TXT Documentation Server
 
 ## Overview
