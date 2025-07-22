@@ -229,7 +229,7 @@ def create_server(
 
     @server.tool(description=fetch_docs_description)
     async def fetch_docs(url: str) -> str:
-        nonlocal domains
+        nonlocal domains, follow_redirects
         url = url.strip()
         # Handle local file paths (either as file:// URLs or direct filesystem paths)
         if not _is_http_or_https(url):
@@ -259,19 +259,29 @@ def create_server(
                 response.raise_for_status()
                 content = response.text
 
-                # Check for meta refresh tag which indicates a client-side redirect
-                match = re.search(
-                    r'<meta http-equiv="refresh" content="[^;]+;\s*url=([^"]+)"',
-                    content,
-                    re.IGNORECASE,
-                )
+                if follow_redirects:
+                    # Check for meta refresh tag which indicates a client-side redirect
+                    match = re.search(
+                        r'<meta http-equiv="refresh" content="[^;]+;\s*url=([^"]+)"',
+                        content,
+                        re.IGNORECASE,
+                    )
 
-                if match:
-                    redirect_url = match.group(1)
-                    new_url = urljoin(str(response.url), redirect_url)
-                    response = await httpx_client.get(new_url, timeout=timeout)
-                    response.raise_for_status()
-                    content = response.text
+                    if match:
+                        redirect_url = match.group(1)
+                        new_url = urljoin(str(response.url), redirect_url)
+                        
+                        if "*" not in domains and not any(
+                            new_url.startswith(domain) for domain in domains
+                        ):
+                            return (
+                                "Error: Redirect URL not allowed. Must start with one of the following domains: "
+                                + ", ".join(domains)
+                            )
+                        
+                        response = await httpx_client.get(new_url, timeout=timeout)
+                        response.raise_for_status()
+                        content = response.text
 
                 return markdownify(content)
             except (httpx.HTTPStatusError, httpx.RequestError) as e:
