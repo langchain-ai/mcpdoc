@@ -1,7 +1,8 @@
 """MCP Llms-txt server for docs."""
 
 import os
-from urllib.parse import urlparse
+import re
+from urllib.parse import urlparse, urljoin
 
 import httpx
 from markdownify import markdownify
@@ -229,6 +230,7 @@ def create_server(
     @server.tool(description=fetch_docs_description)
     async def fetch_docs(url: str) -> str:
         nonlocal domains
+        url = url.strip()
         # Handle local file paths (either as file:// URLs or direct filesystem paths)
         if not _is_http_or_https(url):
             abs_path = _normalize_path(url)
@@ -255,7 +257,23 @@ def create_server(
             try:
                 response = await httpx_client.get(url, timeout=timeout)
                 response.raise_for_status()
-                return markdownify(response.text)
+                content = response.text
+
+                # Check for meta refresh tag which indicates a client-side redirect
+                match = re.search(
+                    r'<meta http-equiv="refresh" content="[^;]+;\s*url=([^"]+)"',
+                    content,
+                    re.IGNORECASE,
+                )
+
+                if match:
+                    redirect_url = match.group(1)
+                    new_url = urljoin(str(response.url), redirect_url)
+                    response = await httpx_client.get(new_url, timeout=timeout)
+                    response.raise_for_status()
+                    content = response.text
+
+                return markdownify(content)
             except (httpx.HTTPStatusError, httpx.RequestError) as e:
                 return f"Encountered an HTTP error: {str(e)}"
 
