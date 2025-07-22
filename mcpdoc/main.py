@@ -270,7 +270,7 @@ def create_server(
                     if match:
                         redirect_url = match.group(1)
                         new_url = urljoin(str(response.url), redirect_url)
-                        
+
                         if "*" not in domains and not any(
                             new_url.startswith(domain) for domain in domains
                         ):
@@ -278,7 +278,7 @@ def create_server(
                                 "Error: Redirect URL not allowed. Must start with one of the following domains: "
                                 + ", ".join(domains)
                             )
-                        
+
                         response = await httpx_client.get(new_url, timeout=timeout)
                         response.raise_for_status()
                         content = response.text
