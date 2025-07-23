@@ -4,7 +4,7 @@
 
 [llms.txt](https://llmstxt.org/) is a website index for LLMs, providing background information, guidance, and links to detailed markdown files. IDEs like Cursor and Windsurf or apps like Claude Code/Desktop can use `llms.txt` to retrieve context for tasks. However, these apps use different built-in tools to read and process files like `llms.txt`. The retrieval process can be opaque, and there is not always a way to audit the tool calls or the context returned.
 
-[MCP](https://github.com/modelcontextprotocol) offers a way for developers to have *full control* over tools used by these applications. Here, we create [an open source MCP server](https://github.com/modelcontextprotocol) to provide MCP host applications (e.g., Cursor, Windsurf, Claude Code/Desktop) with (1) a user-defined list of `llms.txt` files and (2) a simple  `fetch_docs` tool read URLs within any of the provided `llms.txt` files. This allows the user to audit each tool call as well as the context returned. 
+[MCP](https://github.com/modelcontextprotocol) offers a way for developers to have *full control* over tools used by these applications. Here, we create [an open source MCP server](https://github.com/modelcontextprotocol) to provide MCP host applications (e.g., Cursor, Windsurf, Claude Code/Desktop) with (1) a user-defined list of `llms.txt` files and (2) a simple  `fetch_docs` tool read URLs within any of the provided `llms.txt` files. This allows the user to audit each tool call as well as the context returned.
 
 <img src="https://github.com/user-attachments/assets/736f8f55-833d-4200-b833-5fca01a09e1b" width="60%">
 
@@ -28,21 +28,21 @@ You can find llms.txt files for langgraph and langchain here:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-#### Choose an `llms.txt` file to use. 
+#### Choose an `llms.txt` file to use.
 * For example, [here's](https://langchain-ai.github.io/langgraph/llms.txt) the LangGraph `llms.txt` file.
 
 > **Note: Security and Domain Access Control**
-> 
+>
 > For security reasons, mcpdoc implements strict domain access controls:
-> 
+>
 > 1. **Remote llms.txt files**: When you specify a remote llms.txt URL (e.g., `https://langchain-ai.github.io/langgraph/llms.txt`), mcpdoc automatically adds only that specific domain (`langchain-ai.github.io`) to the allowed domains list. This means the tool can only fetch documentation from URLs on that domain.
-> 
+>
 > 2. **Local llms.txt files**: When using a local file, NO domains are automatically added to the allowed list. You MUST explicitly specify which domains to allow using the `--allowed-domains` parameter.
-> 
+>
 > 3. **Adding additional domains**: To allow fetching from domains beyond those automatically included:
 >    - Use `--allowed-domains domain1.com domain2.com` to add specific domains
 >    - Use `--allowed-domains '*'` to allow all domains (use with caution)
-> 
+>
 > This security measure prevents unauthorized access to domains not explicitly approved by the user, ensuring that documentation can only be retrieved from trusted sources.
 
 #### (Optional) Test the MCP server locally with your `llms.txt` file(s) of choice:
@@ -65,9 +65,9 @@ npx @modelcontextprotocol/inspector
 
 ![Screenshot 2025-03-18 at 3 30 30 PM](https://github.com/user-attachments/assets/14645d57-1b52-4a5e-abfe-8e7756772704)
 
-* Here, you can test the `tool` calls. 
+* Here, you can test the `tool` calls.
 
-#### Connect to Cursor 
+#### Connect to Cursor
 
 * Open `Cursor Settings` and `MCP` tab.
 * This will open the `~/.cursor/mcp.json` file.
@@ -100,17 +100,17 @@ npx @modelcontextprotocol/inspector
 * Open Cursor `Settings/Rules` and update `User Rules` with the following (or similar):
 
 ```
-for ANY question about LangGraph, use the langgraph-docs-mcp server to help answer -- 
+for ANY question about LangGraph, use the langgraph-docs-mcp server to help answer --
 + call list_doc_sources tool to get the available llms.txt file
 + call fetch_docs tool to read it
-+ reflect on the urls in llms.txt 
-+ reflect on the input question 
++ reflect on the urls in llms.txt
++ reflect on the input question
 + call fetch_docs on any urls relevant to the question
 + use this to answer the question
 ```
 
 * `CMD+L` (on Mac) to open chat.
-* Ensure `agent` is selected. 
+* Ensure `agent` is selected.
 
 ![Screenshot 2025-03-18 at 1 56 54 PM](https://github.com/user-attachments/assets/0dd747d0-7ec0-43d2-b6ef-cdcf5a2a30bf)
 
@@ -132,11 +132,11 @@ what are types of memory in LangGraph?
 * Update `Windsurf Rules/Global rules` with the following (or similar):
 
 ```
-for ANY question about LangGraph, use the langgraph-docs-mcp server to help answer -- 
+for ANY question about LangGraph, use the langgraph-docs-mcp server to help answer --
 + call list_doc_sources tool to get the available llms.txt file
 + call fetch_docs tool to read it
-+ reflect on the urls in llms.txt 
-+ reflect on the input question 
++ reflect on the urls in llms.txt
++ reflect on the input question
 + call fetch_docs on any urls relevant to the question
 ```
 
@@ -186,11 +186,11 @@ Then, try the example prompt:
 
 ```
 <rules>
-for ANY question about LangGraph, use the langgraph-docs-mcp server to help answer -- 
+for ANY question about LangGraph, use the langgraph-docs-mcp server to help answer --
 + call list_doc_sources tool to get the available llms.txt file
 + call fetch_docs tool to read it
-+ reflect on the urls in llms.txt 
-+ reflect on the input question 
++ reflect on the urls in llms.txt
++ reflect on the input question
 + call fetch_docs on any urls relevant to the question
 </rules>
 ```
@@ -217,7 +217,7 @@ claude mcp add-json langgraph-docs '{"type":"stdio","command":"uvx" ,"args":["--
 * Test by launching Claude Code and running to view your tools:
 ```
 $ Claude
-$ /mcp 
+$ /mcp
 ```
 
 ![Screenshot 2025-03-18 at 2 13 49 PM](https://github.com/user-attachments/assets/eb876a0e-27b4-480e-8c37-0f683f878616)
@@ -227,11 +227,11 @@ $ /mcp
 
 ```
 <rules>
-for ANY question about LangGraph, use the langgraph-docs-mcp server to help answer -- 
+for ANY question about LangGraph, use the langgraph-docs-mcp server to help answer --
 + call list_doc_sources tool to get the available llms.txt file
 + call fetch_docs tool to read it
-+ reflect on the urls in llms.txt 
-+ reflect on the input question 
++ reflect on the urls in llms.txt
++ reflect on the input question
 + call fetch_docs on any urls relevant to the question
 </rules>
 ```
@@ -242,33 +242,112 @@ Then, try the example prompt:
 
 ![Screenshot 2025-03-18 at 2 14 37 PM](https://github.com/user-attachments/assets/5b9a2938-ea69-4443-8d3b-09061faccad0)
 
+## Docker Setup
+
+This section provides instructions for building and running the MCP documentation server using Docker.
+
+### Prerequisites
+
+*   [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
+
+### Building the Image
+
+1.  **Clone the repository (if you haven't already):**
+    ```bash
+    git clone https://github.com/CCwithAi/mcpdoc.git
+    cd mcpdoc
+    ```
+2.  **Build the Docker image:**
+    Open a terminal in the project's root directory (where the `Dockerfile` is located) and run:
+    ```bash
+    docker build -t mcpdoc-server .
+    ```
+    This command builds the image and tags it as `mcpdoc-server`.
+
+### Running the Container
+
+1.  **Run the container with default settings (stdio transport):**
+    ```bash
+    docker run -i --rm mcpdoc-server
+    ```
+    *   `-i`: Runs the container in interactive mode, necessary for `stdio` transport.
+    *   `--rm`: Automatically removes the container when it exits.
+    *   `mcpdoc-server`: The name of the image you built.
+    This command starts the server using the `mcpdoc_config.yaml` file included in the image and communicates via `stdio`. This is suitable for direct integration with MCP clients like Cursor, Windsurf, or Claude Code configured for `stdio`.
+
+2.  **Running with SSE Transport:**
+    If you need to run the server using Server-Sent Events (SSE), for example, to test with the MCP Inspector or connect via HTTP:
+    ```bash
+    docker run -p 8080:8080 --rm mcpdoc-server \
+        uvx --from mcpdoc mcpdoc \
+        --yaml /app/mcpdoc_config.yaml \
+        --transport sse \
+        --port 8080 \
+        --host 0.0.0.0
+    ```
+    *   `-p 8080:8080`: Maps port 8080 on your host machine to port 8080 inside the container.
+    *   We override the default `CMD` to specify `--transport sse`, `--port 8080`, and `--host 0.0.0.0` (to allow connections from outside the container).
+    *   You can then connect to `http://localhost:8080` using the MCP Inspector or configure your MCP client for SSE.
+
+3.  **Using a Custom Configuration File:**
+    To use your own configuration file instead of the default `mcpdoc_config.yaml`:
+    ```bash
+    docker run -i --rm -v /path/to/your/custom_config.yaml:/app/custom_config.yaml mcpdoc-server \
+        uvx --from mcpdoc mcpdoc \
+        --yaml /app/custom_config.yaml \
+        --transport stdio
+    ```
+    *   `-v /path/to/your/custom_config.yaml:/app/custom_config.yaml`: Mounts your local `custom_config.yaml` into the container at `/app/custom_config.yaml`. **Replace `/path/to/your/custom_config.yaml` with the actual path on your host machine.**
+    *   We override the default `CMD` to point to the mounted custom config file.
+
+### Connecting MCP Clients to the Docker Container
+
+*   **For `stdio` transport:** Configure your MCP client (Cursor, Windsurf, Claude Code) to use a command that runs the Docker container.
+    *   **Example for Cursor (`~/.cursor/mcp.json`):**
+        ```json
+        {
+          "mcpServers": {
+            "mcpdoc-docker": {
+              "command": "docker",
+              "args": [
+                "run",
+                "-i",
+                "--rm",
+                "mcpdoc-server"
+              ]
+            }
+          }
+        }
+        ```
+*   **For `sse` transport:** Configure your MCP client to connect to the server's HTTP endpoint (e.g., `http://localhost:8080` if you used the `-p 8080:8080` mapping).
+
 ## Command-line Interface
 
-The `mcpdoc` command provides a simple CLI for launching the documentation server. 
+The `mcpdoc` command provides a simple CLI for launching the documentation server.
 
 You can specify documentation sources in three ways, and these can be combined:
 
-1. Using a YAML config file:
+1.  Using a YAML config file:
 
-* This will load the LangGraph Python documentation from the `sample_config.yaml` file in this repo.
+*   This will load the LangGraph Python documentation from the `sample_config.yaml` file in this repo.
 
 ```bash
 mcpdoc --yaml sample_config.yaml
 ```
 
-2. Using a JSON config file:
+2.  Using a JSON config file:
 
-* This will load the LangGraph Python documentation from the `sample_config.json` file in this repo.
+*   This will load the LangGraph Python documentation from the `sample_config.json` file in this repo.
 
 ```bash
 mcpdoc --json sample_config.json
 ```
 
-3. Directly specifying llms.txt URLs with optional names:
+3.  Directly specifying llms.txt URLs with optional names:
 
-* URLs can be specified either as plain URLs or with optional names using the format `name:url`.
-* You can specify multiple URLs by using the `--urls` parameter multiple times.
-* This is how we loaded `llms.txt` for the MCP server above.
+*   URLs can be specified either as plain URLs or with optional names using the format `name:url`.
+*   You can specify multiple URLs by using the `--urls` parameter multiple times.
+*   This is how we loaded `llms.txt` for the MCP server above.
 
 ```bash
 mcpdoc --urls LangGraph:https://langchain-ai.github.io/langgraph/llms.txt --urls LangChain:https://python.langchain.com/llms.txt
@@ -295,7 +374,7 @@ This will load the LangGraph Python documentation with a 15-second timeout and f
 
 ## Configuration Format
 
-Both YAML and JSON configuration files should contain a list of documentation sources. 
+Both YAML and JSON configuration files should contain a list of documentation sources.
 
 Each source must include an `llms_txt` URL and can optionally include a `name`:
 
@@ -343,4 +422,3 @@ server = create_server(
 
 # Run the server
 server.run(transport="stdio")
-```
