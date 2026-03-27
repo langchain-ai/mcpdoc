@@ -13,6 +13,9 @@ on:
 # There's no point in testing an outdated version of the code. GitHub only allows
 # a limited number of job runners to be active at the same time, so it's better to cancel
 # pointless jobs early so that more useful jobs can run sooner.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -35,7 +38,6 @@ jobs:
     with:
       working-directory: .
       python-version: ${{ matrix.python-version }}
-    secrets: inherit
   test:
     strategy:
       matrix:
@@ -54,5 +56,4 @@ jobs:
     with:
       working-directory: .
       python-version: ${{ matrix.python-version }}
-    secrets: inherit
 
