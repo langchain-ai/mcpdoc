@@ -7,8 +7,6 @@ Bug: --urls tokens are split on the first ':' even when that colon is part of
 a 'file:' URL scheme or a Windows drive letter, not a label separator.
 """
 
-import pytest
-
 from mcpdoc.cli import create_doc_sources_from_urls
 
 
