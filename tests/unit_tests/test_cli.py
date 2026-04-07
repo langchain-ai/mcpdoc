@@ -71,9 +71,7 @@ def test_label_with_http_url():
     )
     assert len(sources) == 1
     assert sources[0]["name"] == "LangGraph"
-    assert (
-        sources[0]["llms_txt"] == "https://langchain-ai.github.io/langgraph/llms.txt"
-    )
+    assert sources[0]["llms_txt"] == "https://langchain-ai.github.io/langgraph/llms.txt"
 
 
 def test_label_with_local_path():
@@ -95,10 +93,7 @@ def test_plain_http_url_no_label():
         ["https://langchain-ai.github.io/langgraph/llms.txt"]
     )
     assert len(sources) == 1
-    assert (
-        sources[0]["llms_txt"]
-        == "https://langchain-ai.github.io/langgraph/llms.txt"
-    )
+    assert sources[0]["llms_txt"] == "https://langchain-ai.github.io/langgraph/llms.txt"
     assert "name" not in sources[0]
 
 
