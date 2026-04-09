@@ -10,8 +10,17 @@
 #   ✓ new_dependencies   — no unexpected new external packages
 #   ✓ dead_code_count    — no dead code introduced
 #
-# The architectural_gate package is installed from amanchaudhary-ops/Merge-Bench-Scripts (central repo).
-# This workflow file is the only architectural gate artifact that lives in each task repo.
+# The architectural_gate package is installed from aneesh-spec/Merge-Bench-Scripts.
+#
+# Usage:
+#   Trigger manually via workflow_dispatch. Patch files must exist in the repo
+#   under .github/patches/. Pass their paths relative to repo root.
+#
+# Example inputs:
+#   agent_diff_path:   .github/patches/agent.diff
+#   creator_diff_path: .github/patches/creator.diff
+#   base_sha:          main   (branch, tag, or commit SHA for baseline tree)
+#   head_sha:          agent-test-phase-b  (branch, tag, or commit SHA for changed tree)
 
 name: Architecture Gate — Phase B (Agent Evaluation)
 
@@ -19,17 +28,19 @@ on:
   workflow_dispatch:
     inputs:
       agent_diff_path:
-        description: "Path to agent unified diff file"
+        description: "Repo-relative path to agent unified diff (e.g. .github/patches/agent.diff)"
         required: true
+        default: ".github/patches/agent.diff"
       creator_diff_path:
-        description: "Path to creator unified diff file (frozen from Phase A)"
+        description: "Repo-relative path to creator unified diff (e.g. .github/patches/creator.diff)"
         required: true
-      repo_initial_path:
-        description: "Path to initial (baseline) repo tree (optional)"
+        default: ".github/patches/creator.diff"
+      base_sha:
+        description: "Base branch/SHA for baseline repo tree (before state)"
         required: false
-        default: ""
-      repo_changed_path:
-        description: "Path to changed repo tree after agent patch (optional)"
+        default: "main"
+      head_sha:
+        description: "Head branch/SHA for changed repo tree (after state)"
         required: false
         default: ""
 
@@ -47,7 +58,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Checkout Architectural_Gate (architectural_gate source)
+      - name: Checkout Merge-Bench-Scripts (architectural_gate source)
         uses: actions/checkout@v4
         with:
           repository: aneesh-spec/Merge-Bench-Scripts
@@ -62,19 +73,41 @@ jobs:
       - name: Install architectural_gate from Merge-Bench-Scripts
         run: pip install ./Merge-Bench-Scripts
 
-      - name: Set Phase B environment variables
+      - name: Materialize before/after repo trees
+        shell: bash
+        run: |
+          set -euo pipefail
+          I="${RUNNER_TEMP}/arch-gate-initial"
+          C="${RUNNER_TEMP}/arch-gate-changed"
+          rm -rf "$I" "$C"
+
+          BASE="${{ inputs.base_sha }}"
+          HEAD="${{ inputs.head_sha }}"
+
+          # Resolve base SHA
+          BASE_SHA=$(git rev-parse "${BASE:-main}")
+
+          # Resolve head SHA — default to current HEAD if not provided
+          if [ -n "${HEAD}" ]; then
+            HEAD_SHA=$(git rev-parse "${HEAD}")
+          else
+            HEAD_SHA=$(git rev-parse HEAD)
+          fi
+
+          git worktree add "$I" "${BASE_SHA}"
+          git worktree add "$C" "${HEAD_SHA}"
+
+          echo "ARCH_GATE_REPO_INITIAL=${I}" >> "${GITHUB_ENV}"
+          echo "ARCH_GATE_REPO_CHANGED=${C}" >> "${GITHUB_ENV}"
+          echo "Baseline: ${BASE_SHA}, Head: ${HEAD_SHA}"
+
+      - name: Set Phase B patch environment variables
         shell: bash
         run: |
           set -euo pipefail
           echo "ARCH_GATE_JSON_LOG=${GITHUB_WORKSPACE}/architectural-gate-log.json" >> "${GITHUB_ENV}"
-          echo "ARCH_GATE_CHANGE_DIFF=${{ inputs.agent_diff_path }}" >> "${GITHUB_ENV}"
-          echo "ARCH_GATE_CREATOR_DIFF=${{ inputs.creator_diff_path }}" >> "${GITHUB_ENV}"
-          if [ -n "${{ inputs.repo_initial_path }}" ]; then
-            echo "ARCH_GATE_REPO_INITIAL=${{ inputs.repo_initial_path }}" >> "${GITHUB_ENV}"
-          fi
-          if [ -n "${{ inputs.repo_changed_path }}" ]; then
-            echo "ARCH_GATE_REPO_CHANGED=${{ inputs.repo_changed_path }}" >> "${GITHUB_ENV}"
-          fi
+          echo "ARCH_GATE_CHANGE_DIFF=${GITHUB_WORKSPACE}/${{ inputs.agent_diff_path }}" >> "${GITHUB_ENV}"
+          echo "ARCH_GATE_CREATOR_DIFF=${GITHUB_WORKSPACE}/${{ inputs.creator_diff_path }}" >> "${GITHUB_ENV}"
 
       - name: Run Architectural Gate (Phase B)
         run: python -m architectural_gate
