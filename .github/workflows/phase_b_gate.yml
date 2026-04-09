@@ -97,8 +97,8 @@ jobs:
           C="${RUNNER_TEMP}/arch-gate-changed"
           rm -rf "$I" "$C"
 
-          # For pull_request events, SHAs are provided directly by GitHub.
-          # For workflow_dispatch, fetch the base branch explicitly.
+          # pull_request: SHAs provided directly by GitHub event context.
+          # workflow_dispatch: fetch base branch explicitly by name.
           PR_BASE="${{ github.event.pull_request.base.sha }}"
           PR_HEAD="${{ github.event.pull_request.head.sha }}"
 
@@ -131,8 +131,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          CREATOR_PATH="${{ inputs.creator_diff_path || '.github/patches/creator.diff' }}"
           echo "ARCH_GATE_JSON_LOG=${GITHUB_WORKSPACE}/architectural-gate-log.json" >> "${GITHUB_ENV}"
-          echo "ARCH_GATE_CREATOR_DIFF=${GITHUB_WORKSPACE}/${{ inputs.creator_diff_path }}" >> "${GITHUB_ENV}"
+          echo "ARCH_GATE_CREATOR_DIFF=${GITHUB_WORKSPACE}/${CREATOR_PATH}" >> "${GITHUB_ENV}"
 
       - name: Run Architectural Gate (Phase B)
         if: steps.check_creator.outputs.exists == 'true'
