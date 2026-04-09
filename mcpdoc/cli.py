@@ -172,7 +172,7 @@ def _is_label_prefix(entry: str) -> bool:
     - URL schemes: http:, https:, file:
     - Windows drive letters: C:, D:, etc. (single alpha char before colon)
     """
-    if not ":" in entry:
+    if ":" not in entry:
         return False
     if entry.startswith(("http:", "https:", "file:")):
         return False
