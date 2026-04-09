@@ -97,24 +97,14 @@ jobs:
           C="${RUNNER_TEMP}/arch-gate-changed"
           rm -rf "$I" "$C"
 
-          # Resolve SHAs — pull_request event provides them directly;
-          # workflow_dispatch falls back to inputs or HEAD.
-          if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-          else
-            # workflow_dispatch: fetch the base branch explicitly
-            BASE_INPUT="${{ inputs.base_sha || 'main' }}"
-            git fetch --no-tags --depth=50 origin "${BASE_INPUT}"
-            BASE_SHA=$(git rev-parse "origin/${BASE_INPUT}" 2>/dev/null || git rev-parse "${BASE_INPUT}")
-            HEAD_INPUT="${{ inputs.head_sha }}"
-            HEAD_SHA=$(git rev-parse "${HEAD_INPUT:-HEAD}")
-          fi
+          BASE="${{ inputs.base_sha }}"
+          HEAD="${{ inputs.head_sha }}"
+
+          BASE_SHA=$(git rev-parse "${BASE:-main}")
+          HEAD_SHA=$(git rev-parse "${HEAD:-HEAD}")
 
           echo "Baseline: ${BASE_SHA}"
           echo "Head:     ${HEAD_SHA}"
-
-          git fetch --no-tags --depth=50 origin "${BASE_SHA}" "${HEAD_SHA}" 2>/dev/null || true
 
           # Materialize before/after trees for api/deps/dead-code checks
           git worktree add "$I" "${BASE_SHA}"
@@ -133,9 +123,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          CREATOR_PATH="${{ inputs.creator_diff_path || '.github/patches/creator.diff' }}"
           echo "ARCH_GATE_JSON_LOG=${GITHUB_WORKSPACE}/architectural-gate-log.json" >> "${GITHUB_ENV}"
-          echo "ARCH_GATE_CREATOR_DIFF=${GITHUB_WORKSPACE}/${CREATOR_PATH}" >> "${GITHUB_ENV}"
+          echo "ARCH_GATE_CREATOR_DIFF=${GITHUB_WORKSPACE}/${{ inputs.creator_diff_path }}" >> "${GITHUB_ENV}"
 
       - name: Run Architectural Gate (Phase B)
         if: steps.check_creator.outputs.exists == 'true'
