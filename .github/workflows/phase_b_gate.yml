@@ -97,20 +97,28 @@ jobs:
           C="${RUNNER_TEMP}/arch-gate-changed"
           rm -rf "$I" "$C"
 
-          BASE="${{ inputs.base_sha }}"
-          HEAD="${{ inputs.head_sha }}"
+          # For pull_request events, SHAs are provided directly by GitHub.
+          # For workflow_dispatch, fetch the base branch explicitly.
+          PR_BASE="${{ github.event.pull_request.base.sha }}"
+          PR_HEAD="${{ github.event.pull_request.head.sha }}"
 
-          BASE_SHA=$(git rev-parse "${BASE:-main}")
-          HEAD_SHA=$(git rev-parse "${HEAD:-HEAD}")
+          if [ -n "${PR_BASE}" ]; then
+            BASE_SHA="${PR_BASE}"
+            HEAD_SHA="${PR_HEAD}"
+          else
+            BASE_INPUT="${{ inputs.base_sha || 'main' }}"
+            git fetch --no-tags --depth=50 origin "${BASE_INPUT}"
+            BASE_SHA=$(git rev-parse "origin/${BASE_INPUT}")
+            HEAD_INPUT="${{ inputs.head_sha }}"
+            HEAD_SHA=$(git rev-parse "${HEAD_INPUT:-HEAD}")
+          fi
 
           echo "Baseline: ${BASE_SHA}"
           echo "Head:     ${HEAD_SHA}"
 
-          # Materialize before/after trees for api/deps/dead-code checks
           git worktree add "$I" "${BASE_SHA}"
           git worktree add "$C" "${HEAD_SHA}"
 
-          # Build agent diff from actual PR changes (base..head)
           git diff "${BASE_SHA}".."${HEAD_SHA}" > "${RUNNER_TEMP}/agent.diff"
           echo "Agent diff lines: $(wc -l < ${RUNNER_TEMP}/agent.diff)"
 
