@@ -25,6 +25,9 @@
 name: Architecture Gate — Phase B (Agent Evaluation)
 
 on:
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       creator_diff_path:
@@ -54,7 +57,21 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check creator diff exists
+        id: check_creator
+        shell: bash
+        run: |
+          CREATOR_PATH="${{ inputs.creator_diff_path || '.github/patches/creator.diff' }}"
+          if [ ! -f "${GITHUB_WORKSPACE}/${CREATOR_PATH}" ]; then
+            echo "exists=false" >> "${GITHUB_OUTPUT}"
+            echo "Creator diff not found at ${CREATOR_PATH} — skipping Phase B gate."
+          else
+            echo "exists=true" >> "${GITHUB_OUTPUT}"
+            echo "Creator diff found at ${CREATOR_PATH} — running Phase B gate."
+          fi
+
       - name: Checkout Merge-Bench-Scripts (architectural_gate source)
+        if: steps.check_creator.outputs.exists == 'true'
         uses: actions/checkout@v4
         with:
           repository: aneesh-spec/Merge-Bench-Scripts
@@ -62,14 +79,17 @@ jobs:
           token: ${{ secrets.MERGE_BENCH_TOKEN }}
 
       - name: Setup Python
+        if: steps.check_creator.outputs.exists == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install architectural_gate from Merge-Bench-Scripts
+        if: steps.check_creator.outputs.exists == 'true'
         run: pip install ./Merge-Bench-Scripts
 
       - name: Materialize before/after trees and build agent diff
+        if: steps.check_creator.outputs.exists == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -99,6 +119,7 @@ jobs:
           echo "ARCH_GATE_CHANGE_DIFF=${RUNNER_TEMP}/agent.diff" >> "${GITHUB_ENV}"
 
       - name: Set creator diff and log path
+        if: steps.check_creator.outputs.exists == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -106,11 +127,12 @@ jobs:
           echo "ARCH_GATE_CREATOR_DIFF=${GITHUB_WORKSPACE}/${{ inputs.creator_diff_path }}" >> "${GITHUB_ENV}"
 
       - name: Run Architectural Gate (Phase B)
+        if: steps.check_creator.outputs.exists == 'true'
         run: python -m architectural_gate
 
       - name: Upload gate log
         uses: actions/upload-artifact@v4
-        if: always()
+        if: steps.check_creator.outputs.exists == 'true'
         with:
           name: architectural-gate-log-phase-b
           path: architectural-gate-log.json
