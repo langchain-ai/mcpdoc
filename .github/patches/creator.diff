@@ -1,0 +1,26 @@
+diff --git a/mcpdoc/cli.py b/mcpdoc/cli.py
+index 2634dd4..d5b2796 100644
+--- a/mcpdoc/cli.py
++++ b/mcpdoc/cli.py
+@@ -179,12 +179,18 @@ def create_doc_sources_from_urls(urls: List[str]) -> List[DocSource]:
+     for entry in urls:
+         if not entry.strip():
+             continue
+-        if ":" in entry and not entry.startswith(("http:", "https:")):
++        parts = entry.split(":", 1)
++        is_windows_drive = len(parts[0]) == 1 and parts[0].isalpha()
++        if (
++            ":" in entry
++            and not entry.startswith(("http:", "https:", "file:"))
++            and not is_windows_drive
++        ):
+             # Format is name:url
+-            name, url = entry.split(":", 1)
++            name, url = parts
+             doc_sources.append({"name": name, "llms_txt": url})
+         else:
+-            # Format is just url
++            # Format is just url or file: URL or Windows drive path
+             doc_sources.append({"llms_txt": entry})
+     return doc_sources
+ 

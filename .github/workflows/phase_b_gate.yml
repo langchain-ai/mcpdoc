@@ -1,0 +1,148 @@
+# Phase B — Agent Patch Evaluation
+#
+# Runs when an AI agent produces a patch for a frozen task from Phase A.
+# Evaluates the agent's patch against the creator's reference patch.
+#
+# Checks enforced (all five):
+#   ✓ scope_score        — agent stayed within creator's file scope
+#   ✓ blast_ratio        — agent wrote proportionally as much code as creator
+#   ✓ api_surface_score  — no breaking public API changes
+#   ✓ new_dependencies   — no unexpected new external packages
+#   ✓ dead_code_count    — no dead code introduced
+#
+# The architectural_gate package is installed from aneesh-spec/Merge-Bench-Scripts.
+#
+# Agent diff is built automatically from the PR's base..head diff.
+# Creator diff must exist in the repo at the path specified by creator_diff_path.
+#
+# Trigger: manually via workflow_dispatch on the agent's PR branch.
+#
+# Example inputs:
+#   creator_diff_path: .github/patches/creator.diff
+#   base_sha:          main
+#   head_sha:          (leave blank to use current HEAD)
+
+name: Architecture Gate — Phase B (Agent Evaluation)
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      creator_diff_path:
+        description: "Repo-relative path to creator unified diff (e.g. .github/patches/creator.diff)"
+        required: true
+        default: ".github/patches/creator.diff"
+      base_sha:
+        description: "Base branch/SHA for baseline tree and agent diff base"
+        required: false
+        default: "main"
+      head_sha:
+        description: "Head branch/SHA for agent diff and changed tree (leave blank for current HEAD)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  phase-b-gate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout task repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check creator diff exists
+        id: check_creator
+        shell: bash
+        run: |
+          CREATOR_PATH="${{ inputs.creator_diff_path || '.github/patches/creator.diff' }}"
+          if [ ! -f "${GITHUB_WORKSPACE}/${CREATOR_PATH}" ]; then
+            echo "exists=false" >> "${GITHUB_OUTPUT}"
+            echo "Creator diff not found at ${CREATOR_PATH} — skipping Phase B gate."
+          else
+            echo "exists=true" >> "${GITHUB_OUTPUT}"
+            echo "Creator diff found at ${CREATOR_PATH} — running Phase B gate."
+          fi
+
+      - name: Checkout Merge-Bench-Scripts (architectural_gate source)
+        if: steps.check_creator.outputs.exists == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: aneesh-spec/Merge-Bench-Scripts
+          path: Merge-Bench-Scripts
+          token: ${{ secrets.MERGE_BENCH_TOKEN }}
+
+      - name: Setup Python
+        if: steps.check_creator.outputs.exists == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install architectural_gate from Merge-Bench-Scripts
+        if: steps.check_creator.outputs.exists == 'true'
+        run: pip install ./Merge-Bench-Scripts
+
+      - name: Materialize before/after trees and build agent diff
+        if: steps.check_creator.outputs.exists == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          I="${RUNNER_TEMP}/arch-gate-initial"
+          C="${RUNNER_TEMP}/arch-gate-changed"
+          rm -rf "$I" "$C"
+
+          # pull_request: SHAs provided directly by GitHub event context.
+          # workflow_dispatch: fetch base branch explicitly by name.
+          PR_BASE="${{ github.event.pull_request.base.sha }}"
+          PR_HEAD="${{ github.event.pull_request.head.sha }}"
+
+          if [ -n "${PR_BASE}" ]; then
+            BASE_SHA="${PR_BASE}"
+            HEAD_SHA="${PR_HEAD}"
+          else
+            BASE_INPUT="${{ inputs.base_sha || 'main' }}"
+            git fetch --no-tags --depth=50 origin "${BASE_INPUT}"
+            BASE_SHA=$(git rev-parse "origin/${BASE_INPUT}")
+            HEAD_INPUT="${{ inputs.head_sha }}"
+            HEAD_SHA=$(git rev-parse "${HEAD_INPUT:-HEAD}")
+          fi
+
+          echo "Baseline: ${BASE_SHA}"
+          echo "Head:     ${HEAD_SHA}"
+
+          git worktree add "$I" "${BASE_SHA}"
+          git worktree add "$C" "${HEAD_SHA}"
+
+          git diff "${BASE_SHA}".."${HEAD_SHA}" > "${RUNNER_TEMP}/agent.diff"
+          echo "Agent diff lines: $(wc -l < ${RUNNER_TEMP}/agent.diff)"
+
+          echo "ARCH_GATE_REPO_INITIAL=${I}" >> "${GITHUB_ENV}"
+          echo "ARCH_GATE_REPO_CHANGED=${C}" >> "${GITHUB_ENV}"
+          echo "ARCH_GATE_CHANGE_DIFF=${RUNNER_TEMP}/agent.diff" >> "${GITHUB_ENV}"
+
+      - name: Set creator diff and log path
+        if: steps.check_creator.outputs.exists == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          CREATOR_PATH="${{ inputs.creator_diff_path || '.github/patches/creator.diff' }}"
+          echo "ARCH_GATE_JSON_LOG=${GITHUB_WORKSPACE}/architectural-gate-log.json" >> "${GITHUB_ENV}"
+          echo "ARCH_GATE_CREATOR_DIFF=${GITHUB_WORKSPACE}/${CREATOR_PATH}" >> "${GITHUB_ENV}"
+
+      - name: Run Architectural Gate (Phase B)
+        if: steps.check_creator.outputs.exists == 'true'
+        run: python -m architectural_gate
+
+      - name: Upload gate log
+        uses: actions/upload-artifact@v4
+        if: steps.check_creator.outputs.exists == 'true'
+        with:
+          name: architectural-gate-log-phase-b
+          path: architectural-gate-log.json
+          if-no-files-found: ignore
