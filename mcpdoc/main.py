@@ -138,6 +138,29 @@ def _get_server_instructions(doc_sources: list[DocSource]) -> str:
     return "\n".join(instructions)
 
 
+def _validate_url_domain(url: str, domains: set[str]) -> tuple[bool, str]:
+    """Validate if a URL is from an allowed domain.
+
+    Args:
+        url: URL to validate
+        domains: Set of allowed domains or {'*'} for all domains
+
+    Returns:
+        Tuple of (is_valid, error_message). error_message is empty if valid.
+    """
+    if "*" in domains:
+        return True, ""
+
+    if not any(url.startswith(domain) for domain in domains):
+        error_msg = (
+            "Error: URL not allowed. Must start with one of the following domains: "
+            + ", ".join(sorted(domains))
+        )
+        return False, error_msg
+
+    return True, ""
+
+
 def create_server(
     doc_sources: list[DocSource],
     *,
@@ -229,8 +252,17 @@ def create_server(
 
     @server.tool(description=fetch_docs_description)
     async def fetch_docs(url: str) -> str:
+        """Fetch documentation from a URL or local file.
+
+        Args:
+            url: URL or file path to fetch documentation from
+
+        Returns:
+            Documentation content as markdown or error message
+        """
         nonlocal domains, follow_redirects
         url = url.strip()
+
         # Handle local file paths (either as file:// URLs or direct filesystem paths)
         if not _is_http_or_https(url):
             abs_path = _normalize_path(url)
@@ -244,47 +276,40 @@ def create_server(
                 return markdownify(content)
             except Exception as e:
                 return f"Error reading local file: {str(e)}"
-        else:
-            # Otherwise treat as URL
-            if "*" not in domains and not any(
-                url.startswith(domain) for domain in domains
-            ):
-                return (
-                    "Error: URL not allowed. Must start with one of the following domains: "
-                    + ", ".join(domains)
+
+        # Handle remote URLs
+        is_valid, error_msg = _validate_url_domain(url, domains)
+        if not is_valid:
+            return error_msg
+
+        try:
+            response = await httpx_client.get(url, timeout=timeout)
+            response.raise_for_status()
+            content = response.text
+
+            # Handle meta refresh redirects if enabled
+            if follow_redirects:
+                match = re.search(
+                    r'<meta http-equiv="refresh" content="[^;]+;\s*url=([^"]+)"',
+                    content,
+                    re.IGNORECASE,
                 )
 
-            try:
-                response = await httpx_client.get(url, timeout=timeout)
-                response.raise_for_status()
-                content = response.text
+                if match:
+                    redirect_url = match.group(1)
+                    new_url = urljoin(str(response.url), redirect_url)
 
-                if follow_redirects:
-                    # Check for meta refresh tag which indicates a client-side redirect
-                    match = re.search(
-                        r'<meta http-equiv="refresh" content="[^;]+;\s*url=([^"]+)"',
-                        content,
-                        re.IGNORECASE,
-                    )
+                    # Validate redirect URL
+                    is_valid, error_msg = _validate_url_domain(new_url, domains)
+                    if not is_valid:
+                        return error_msg
 
-                    if match:
-                        redirect_url = match.group(1)
-                        new_url = urljoin(str(response.url), redirect_url)
+                    response = await httpx_client.get(new_url, timeout=timeout)
+                    response.raise_for_status()
+                    content = response.text
 
-                        if "*" not in domains and not any(
-                            new_url.startswith(domain) for domain in domains
-                        ):
-                            return (
-                                "Error: Redirect URL not allowed. Must start with one of the following domains: "
-                                + ", ".join(domains)
-                            )
-
-                        response = await httpx_client.get(new_url, timeout=timeout)
-                        response.raise_for_status()
-                        content = response.text
-
-                return markdownify(content)
-            except (httpx.HTTPStatusError, httpx.RequestError) as e:
-                return f"Encountered an HTTP error: {str(e)}"
+            return markdownify(content)
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            return f"Encountered an HTTP error: {str(e)}"
 
     return server
