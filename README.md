@@ -1,5 +1,7 @@
 # MCP LLMS-TXT Documentation Server
 
+[![MCP Toplist](https://mcptoplist.com/badge/glama%2Flangchain-ai%2Fmcpdoc.svg)](https://mcptoplist.com/server/glama%2Flangchain-ai%2Fmcpdoc)
+
 ## Overview
 
 [llms.txt](https://llmstxt.org/) is a website index for LLMs, providing background information, guidance, and links to detailed markdown files. IDEs like Cursor and Windsurf or apps like Claude Code/Desktop can use `llms.txt` to retrieve context for tasks. However, these apps use different built-in tools to read and process files like `llms.txt`. The retrieval process can be opaque, and there is not always a way to audit the tool calls or the context returned.
