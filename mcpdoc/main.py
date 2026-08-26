@@ -36,6 +36,10 @@ def extract_domain(url: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}/"
 
 
+class _RedirectNotAllowed(Exception):  # noqa: N818
+    """A redirect target fell outside the configured domain allowlist."""
+
+
 def _is_http_or_https(url: str) -> bool:
     """Check if the URL is an HTTP or HTTPS URL."""
     return url.startswith(("http:", "https:"))
@@ -167,7 +171,10 @@ def create_server(
         instructions=_get_server_instructions(doc_sources),
         **settings,
     )
-    httpx_client = httpx.AsyncClient(follow_redirects=follow_redirects, timeout=timeout)
+    # Redirects are followed manually in `_get_checking_redirects` so that each
+    # hop can be checked against the allowlist before it is requested; letting
+    # the client follow them would skip that check.
+    httpx_client = httpx.AsyncClient(follow_redirects=False, timeout=timeout)
 
     local_sources = []
     remote_sources = []
@@ -227,6 +234,46 @@ def create_server(
         has_local_sources=bool(local_sources)
     )
 
+    def _is_allowed(candidate_url: str) -> bool:
+        """Whether ``candidate_url`` is covered by the configured allowlist."""
+        return "*" in domains or any(
+            candidate_url.startswith(domain) for domain in domains
+        )
+
+    async def _get_checking_redirects(url: str) -> httpx.Response:
+        """GET ``url``, checking every redirect target before it is requested.
+
+        ``httpx`` follows redirects transparently, so an allowed URL could hand
+        off to a domain outside the allowlist without that target ever being
+        checked. Redirects are followed manually here instead, so each hop is
+        validated *before* the request goes out -- the same order the meta
+        refresh branch in :func:`fetch_docs` already uses.
+
+        ``url`` itself must already have been checked by the caller.
+
+        Raises:
+            _RedirectNotAllowed: A redirect pointed outside the allowlist.
+            httpx.TooManyRedirects: The chain exceeded ``max_redirects`` hops.
+        """
+        response = await httpx_client.get(url, timeout=timeout)
+        if not follow_redirects:
+            return response
+
+        for _ in range(httpx_client.max_redirects):
+            if not response.has_redirect_location:
+                return response
+
+            next_url = urljoin(str(response.url), response.headers["location"])
+            if not _is_allowed(next_url):
+                raise _RedirectNotAllowed
+            response = await httpx_client.get(next_url, timeout=timeout)
+
+        if response.has_redirect_location:
+            raise httpx.TooManyRedirects(
+                "Exceeded maximum allowed redirects.", request=response.request
+            )
+        return response
+
     @server.tool(description=fetch_docs_description)
     async def fetch_docs(url: str) -> str:
         nonlocal domains, follow_redirects
@@ -246,16 +293,14 @@ def create_server(
                 return f"Error reading local file: {str(e)}"
         else:
             # Otherwise treat as URL
-            if "*" not in domains and not any(
-                url.startswith(domain) for domain in domains
-            ):
+            if not _is_allowed(url):
                 return (
                     "Error: URL not allowed. Must start with one of the following domains: "
                     + ", ".join(domains)
                 )
 
             try:
-                response = await httpx_client.get(url, timeout=timeout)
+                response = await _get_checking_redirects(url)
                 response.raise_for_status()
                 content = response.text
 
@@ -271,19 +316,19 @@ def create_server(
                         redirect_url = match.group(1)
                         new_url = urljoin(str(response.url), redirect_url)
 
-                        if "*" not in domains and not any(
-                            new_url.startswith(domain) for domain in domains
-                        ):
-                            return (
-                                "Error: Redirect URL not allowed. Must start with one of the following domains: "
-                                + ", ".join(domains)
-                            )
+                        if not _is_allowed(new_url):
+                            raise _RedirectNotAllowed
 
-                        response = await httpx_client.get(new_url, timeout=timeout)
+                        response = await _get_checking_redirects(new_url)
                         response.raise_for_status()
                         content = response.text
 
                 return markdownify(content)
+            except _RedirectNotAllowed:
+                return (
+                    "Error: Redirect URL not allowed. Must start with one of the following domains: "
+                    + ", ".join(domains)
+                )
             except (httpx.HTTPStatusError, httpx.RequestError) as e:
                 return f"Encountered an HTTP error: {str(e)}"
 
