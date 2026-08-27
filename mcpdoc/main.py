@@ -138,6 +138,11 @@ def _get_server_instructions(doc_sources: list[DocSource]) -> str:
     return "\n".join(instructions)
 
 
+def _url_allowed(url: str, domains: set[str]) -> bool:
+    """Return whether *url* starts with an allowed domain."""
+    return "*" in domains or any(url.startswith(domain) for domain in domains)
+
+
 def create_server(
     doc_sources: list[DocSource],
     *,
@@ -167,7 +172,7 @@ def create_server(
         instructions=_get_server_instructions(doc_sources),
         **settings,
     )
-    httpx_client = httpx.AsyncClient(follow_redirects=follow_redirects, timeout=timeout)
+    httpx_client = httpx.AsyncClient(follow_redirects=False, timeout=timeout)
 
     local_sources = []
     remote_sources = []
@@ -231,6 +236,33 @@ def create_server(
     async def fetch_docs(url: str) -> str:
         nonlocal domains, follow_redirects
         url = url.strip()
+
+        async def fetch_allowed_url(
+            current_url: str,
+        ) -> tuple[httpx.Response | None, str | None]:
+            for redirect_count in range(httpx_client.max_redirects + 1):
+                if not _url_allowed(current_url, domains):
+                    return (
+                        None,
+                        "Error: Redirect URL not allowed. Must start with one of the following domains: "
+                        + ", ".join(domains),
+                    )
+
+                response = await httpx_client.get(current_url, timeout=timeout)
+                if not follow_redirects or not response.has_redirect_location:
+                    response.raise_for_status()
+                    return response, None
+
+                location = response.headers.get("location")
+                if not location:
+                    response.raise_for_status()
+                    return response, None
+                if redirect_count == httpx_client.max_redirects:
+                    return None, "Error: Too many redirects."
+                current_url = urljoin(str(response.url), location)
+
+            raise AssertionError("unreachable")
+
         # Handle local file paths (either as file:// URLs or direct filesystem paths)
         if not _is_http_or_https(url):
             abs_path = _normalize_path(url)
@@ -246,17 +278,17 @@ def create_server(
                 return f"Error reading local file: {str(e)}"
         else:
             # Otherwise treat as URL
-            if "*" not in domains and not any(
-                url.startswith(domain) for domain in domains
-            ):
+            if not _url_allowed(url, domains):
                 return (
                     "Error: URL not allowed. Must start with one of the following domains: "
                     + ", ".join(domains)
                 )
 
             try:
-                response = await httpx_client.get(url, timeout=timeout)
-                response.raise_for_status()
+                response, error = await fetch_allowed_url(url)
+                if error:
+                    return error
+                assert response is not None
                 content = response.text
 
                 if follow_redirects:
@@ -271,16 +303,16 @@ def create_server(
                         redirect_url = match.group(1)
                         new_url = urljoin(str(response.url), redirect_url)
 
-                        if "*" not in domains and not any(
-                            new_url.startswith(domain) for domain in domains
-                        ):
+                        if not _url_allowed(new_url, domains):
                             return (
                                 "Error: Redirect URL not allowed. Must start with one of the following domains: "
                                 + ", ".join(domains)
                             )
 
-                        response = await httpx_client.get(new_url, timeout=timeout)
-                        response.raise_for_status()
+                        response, error = await fetch_allowed_url(new_url)
+                        if error:
+                            return error
+                        assert response is not None
                         content = response.text
 
                 return markdownify(content)
