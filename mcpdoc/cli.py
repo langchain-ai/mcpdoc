@@ -165,6 +165,23 @@ def load_config_file(file_path: str, file_format: str) -> List[Dict[str, str]]:
         sys.exit(1)
 
 
+def _is_label_prefix(entry: str) -> bool:
+    """Return True only if the first colon in entry is a label separator.
+
+    Colons that are NOT label separators:
+    - URL schemes: http:, https:, file:
+    - Windows drive letters: C:, D:, etc. (single alpha char before colon)
+    """
+    if ":" not in entry:
+        return False
+    if entry.startswith(("http:", "https:", "file:")):
+        return False
+    prefix = entry.split(":", 1)[0]
+    if len(prefix) == 1 and prefix.isalpha():
+        return False
+    return True
+
+
 def create_doc_sources_from_urls(urls: List[str]) -> List[DocSource]:
     """Create doc sources from a list of URLs or file paths with optional names.
 
@@ -179,12 +196,12 @@ def create_doc_sources_from_urls(urls: List[str]) -> List[DocSource]:
     for entry in urls:
         if not entry.strip():
             continue
-        if ":" in entry and not entry.startswith(("http:", "https:")):
-            # Format is name:url
+        if _is_label_prefix(entry):
+            # Format is name:url_or_path
             name, url = entry.split(":", 1)
             doc_sources.append({"name": name, "llms_txt": url})
         else:
-            # Format is just url
+            # Format is just url or path (file:, http:, https:, Windows drive, unix path)
             doc_sources.append({"llms_txt": entry})
     return doc_sources
 
